@@ -35,6 +35,8 @@ body {
   &__filter {
     margin-bottom: 15px;
     margin-top: -33px;
+    display: flex;
+    justify-content: space-between;
 
     &-list {
       padding: 0;
@@ -43,7 +45,17 @@ body {
       display: flex;
       flex-flow: row wrap;
       justify-content: flex-start;
+    }
+
+    &-check {
+      display: flex;
+      flex-flow: row wrap;
+      justify-content: flex-end;
       align-content: center;
+
+      input[type="checkbox"]{
+        margin: 3px 5px 0px 0px;
+      }
     }
 
     &-item {
@@ -51,7 +63,6 @@ body {
       cursor: pointer;
 
       &-active {
-        font-weight: bold;
         color: #07b8f8;
       }
 

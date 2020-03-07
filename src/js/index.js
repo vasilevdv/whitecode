@@ -2,15 +2,26 @@ import 'babel-polyfill';
 import _ from 'lodash';
 
 import './../sass/styles.scss';
-import products from './products.json';
+import productsJSON from './products.json';
 
 const productsWrapper = document.querySelector('.products__list');
+const filterWrapper = document.querySelector('.products__filter');
 const basketWrapper = document.querySelector('.products__basket-wrapper');
 const paginationWrapper = document.querySelector('.products__pagination-list');
-const countProductPage = 15;
-const countProducts = products.length;
-const countPages = Math.round(countProducts / countProductPage);
 const textGoods = ["товаров", "товар", "товара", "товаров"]; 
+
+const sortFunctionName = (a, b) => {
+  var nameA=a.title.toLowerCase(), nameB=b.title.toLowerCase();
+  if (nameA < nameB)
+    return -1;
+  if (nameA > nameB)
+    return 1;
+    return 0;
+}
+
+const sortFunctionPrice = (a, b) => {
+  return a.price - b.price;
+}
 
 let startProductPage = 0;
 let currentProductPage = 1;
@@ -18,8 +29,49 @@ let items = JSON.parse(localStorage.getItem('cart-items'));
 
 
 class ProductItems {
-  constructor(product) {
-    this.product = product;
+  constructor(sortable) {
+    this.sortable = sortable || 'title';
+    this.available = null;
+    this.countProductPage = 15;
+    this.products = productsJSON;
+    this.countProducts = this.products.length;
+    this.countPages = Math.round(this.countProducts / this.countProductPage);
+  }
+
+  // Сортируем товары
+  sortableProducts() {
+    if (this.sortable == 'price') {
+      return this.products.sort(sortFunctionPrice);
+    } else {
+      return this.products.sort(sortFunctionName);
+    }
+  }
+
+  // Выводим только то, что доступно
+  availableProduct() {
+    if (this.available) {
+      this.products = this.products.filter(product => product.available === true);
+    } else {
+      this.products = productsJSON;
+      this.sortableProducts();
+    }
+  }
+
+  // Пересчёт результатов
+  calculationResult() {
+    this.countProducts = this.products.length;
+    this.countPages = Math.round(this.countProducts / this.countProductPage);
+  }
+
+  // Шаблон сортировки
+  templateSorts() {
+    return `
+      <ul class="products__filter-list">
+        <li data-type="title" class="products__filter-item">по названию товара</li>
+        <li data-type="price" class="products__filter-item">по цене</li>
+      </ul>
+      <label class="products__filter-check"><input type="checkbox" name="available">в наличии</label>
+    `;
   }
 
   // Шаблон корзины
@@ -101,14 +153,16 @@ class ProductItems {
   }
 
   // Получаем все товары текущей страницы
-  getAllProductsPage() {
+  getAllProductsPage(sort) {
     let i = 0;
     let pr = '';
 
-    products.forEach((product, index) => {
-      if (i < countProductPage &&
+    let prods = this.sortableProducts();
+    this.calculationResult(prods);
+    prods.forEach((product, index) => {
+      if (i < this.countProductPage &&
         index >= startProductPage &&
-        index < (startProductPage + countProductPage)
+        index < (startProductPage + this.countProductPage)
       ) {
         pr += this.getProductsPage(product);
         i++;
@@ -124,19 +178,19 @@ class ProductItems {
     let prevItem = currentProductPage - 1;
     let nextItem = currentProductPage + 1;
 
-    if (countPages > 3 && currentProductPage > 2) {
+    if (this.countPages > 3 && currentProductPage > 2) {
       pager += `<li data-page="${prevItem}" class="products__pagination-item products__pagination-prev"><</li>`;
     }
 
     if (currentProductPage) {
-      if (currentProductPage == countPages) {
+      if (currentProductPage == this.countPages) {
         pager += `<li data-page="${prevItem - 1}" class="products__pagination-item next">${prevItem - 1}</li>`;
       }
       if (prevItem >= 1) {
         pager += `<li data-page="${prevItem}" class="products__pagination-item prev">${prevItem}</li>`;
       }
       pager += `<li data-page="${currentProductPage}" class="products__pagination-item products__pagination-item-current">${currentProductPage}</li>`;
-      if (nextItem <= countPages) {
+      if (nextItem <= this.countPages) {
         pager += `<li data-page="${nextItem}" class="products__pagination-item next">${nextItem}</li>`;
       }
       if (currentProductPage == 1) {
@@ -144,14 +198,14 @@ class ProductItems {
       }
     }
 
-    if (countPages > 4) {
-      if (nextItem < countPages) {
+    if (this.countPages > 4) {
+      if (nextItem < this.countPages) {
         pager += `<li class="products__pagination-item products__pagination-empty">...</li>`;
-        pager += `<li data-page="${countPages}" class="products__pagination-item">${countPages}</li>`;
+        pager += `<li data-page="${this.countPages}" class="products__pagination-item">${this.countPages}</li>`;
       }
     }
 
-    if (countPages > 3 && nextItem <= countPages) {
+    if (this.countPages > 3 && nextItem <= this.countPages) {
       pager += `<li data-page="${nextItem}" class="products__pagination-item products__pagination-next">></li>`;
     }
 
@@ -215,10 +269,10 @@ class ProductItems {
   // Установка товара в корзину
   setItemToBasket(indexCurrent, productCurrent) {
     let arr = {};
-    arr.id = products[indexCurrent].id;
-    arr.title = products[indexCurrent].title;
-    arr.price = products[indexCurrent].price;
-    arr.image = products[indexCurrent].image;
+    arr.id = this.products[indexCurrent].id;
+    arr.title = this.products[indexCurrent].title;
+    arr.price = this.products[indexCurrent].price;
+    arr.image = this.products[indexCurrent].image;
     arr.count = 1;
 
     productCurrent.push(arr);
@@ -230,7 +284,7 @@ class ProductItems {
   addToCart(id) {
     let productCurrent = [];
     let indexCurrent = -1;
-    products.forEach((product, index) => {
+    this.products.forEach((product, index) => {
       if (product.id == id) {
         indexCurrent = index;
       }
@@ -297,13 +351,60 @@ class ProductItems {
   // Поиск продукта по ID
   searchProductByID(id) {
     let findProduct = false;
-    products.forEach((product, index) => {
+    this.products.forEach((product, index) => {
       if (product.id == id) {
         findProduct = product;
       }
     });
 
     return findProduct;
+  }
+
+  // Обработчик действий checkbox
+  actionAvailablePage() {
+    if (document.querySelector('.products__filter-check')) {
+      const check = document.querySelector('.products__filter-check');
+      const checkbox = check.querySelector('input');
+
+      checkbox.addEventListener('change', (e) => {
+        let target = e.target;
+        this.available = target.checked || null;
+        this.availableProduct();
+        this.calculationResult();
+        this.updateProducts();
+      });
+    }
+  }
+
+  // Обработчик действий сортировки
+  actionSortPage(item) {
+    if (document.querySelectorAll('.products__filter-item')) {
+      const sort = document.querySelectorAll('.products__filter-item');
+      const actives = document.querySelectorAll('.products__filter-item-active');
+      if (!actives.length) {
+        document.querySelector('.products__filter-item').classList.add('products__filter-item-active');
+      }
+
+      Object.values(sort).map((item) => {
+        item.addEventListener('click', (e) => {
+          let target = e.target;
+          this.sortable = target.dataset.type;
+          let listFilter = target.closest('.products__filter-list');
+          let activeItem = listFilter.querySelector('.products__filter-item-active');
+
+          if (activeItem) {
+            activeItem.classList.remove('products__filter-item-active');
+          }
+          target.classList.add('products__filter-item-active');
+          currentProductPage = 1;
+          this.sortableProducts();
+          this.calculationResult();
+          this.updateProducts();
+
+          // if (!item.classList.contains('products__filter-item-active')) {
+        });
+      });
+    }
   }
 
   // Вешаем обработчик удаления из корзины
@@ -386,9 +487,9 @@ class ProductItems {
   }
 
   // Обновляем блок с товарами и пагинацией
-  updateProducts() {
+  updateProducts(sort) {
     // Получаем начальное значение
-    startProductPage = ((currentProductPage * countProductPage) - countProductPage);
+    startProductPage = ((currentProductPage * this.countProductPage) - this.countProductPage);
 
     // Чистим содержимое блоков
     basketWrapper.innerHTML = "";
@@ -410,12 +511,21 @@ class ProductItems {
       this.actionPaginationPage();
     }
   }
+
+  updateSorts() { 
+    if (filterWrapper) {
+      filterWrapper.innerHTML = this.templateSorts();
+      this.actionSortPage();
+      this.actionAvailablePage();
+    }
+  }
 }
 
 /*
 *  Если есть товары
 */
-if (products.length) {
+if (productsJSON.length) {
   const dict = new ProductItems();
   dict.updateProducts();
+  dict.updateSorts();
 }
